@@ -1,0 +1,65 @@
+# =============================================================================
+# individual-knowledge-base 配置示例
+# =============================================================================
+# 复制此文件为 config.yaml 并按需修改。
+# 敏感信息（API Key）优先从环境变量读取，也可直接填写。
+#
+# 环境变量名：
+#   DEEPSEEK_API_KEY   — LLM（DeepSeek 提供商）
+#   DASHSCOPE_API_KEY  — Embedding（阿里云 DashScope）
+#   MINERU_API_KEY     — MinerU OCR 服务
+#
+# 若设置了环境变量，config.yaml 中对应的 api_key 字段可留空。
+
+llm:
+  provider: deepseek               # xiaomi | deepseek | ollama
+  base_url: "https://api.deepseek.com"
+  api_key: ""                      # 或设置环境变量 DEEPSEEK_API_KEY
+  model: "deepseek-chat"
+  max_tokens: 4096
+  temperature: 0.7
+  timeout: 300                     # LLM 调用超时（秒），大文档+复杂查询需要更长
+
+embedding:
+  provider: dashscope            # deepseek | dashscope | ollama
+  base_url: "https://dashscope.aliyuncs.com/compatible-mode/v1"
+  api_key: ""                      # 或设置环境变量 DASHSCOPE_API_KEY
+  model: "text-embedding-v4"
+
+pdf:
+  routing:
+    auto: true                     # 自动路由分类；设为 false 后走 engine 指定值
+    engine: ~                      # pymupdf | mineru | ~ (自动)
+  classifier:
+    formula_density_threshold: 0.02    # 公式符号占比 ≥2% 标记为论文
+    min_citation_count: 3              # 引用标记 ≥3 触发论文通道
+    min_academic_keywords: 2           # 学术关键词 ≥2 触发论文通道
+
+mineru:
+  api_url: "https://mineru.net/api/v4"  # MinerU SaaS v4 API 根地址
+  api_key: ""                            # 或设置环境变量 MINERU_API_KEY
+  timeout: 300                           # 单次轮询超时（秒）
+
+knowledge_graph:
+  working_dir: "./kb_data"          # 知识图谱数据存储目录
+  chunk_strategy: "R"               # 分块策略: "F"（固定 token 窗口）/ "R"（递归字符分割，中文推荐）
+  chunk_size: 8192                  # 文档分块大小（token 数），大文档建议 8192
+  chunk_overlap: 512                # 分块重叠大小（token 数）
+  top_k: 40                         # 检索的实体/关系数量上限
+  chunk_top_k: 15                   # 检索后保留的原文块数量上限
+  max_entity_tokens: 6000           # 实体上下文的 token 预算
+  max_relation_tokens: 8000         # 关系上下文的 token 预算
+  max_total_tokens: 50000           # LLM 上下文总 token 预算（调小避免超时）
+  query_timeout: 60                 # 查询总超时（秒）
+  bm25:
+    enabled: true                   # 是否启用 BM25 多路召回
+    top_k: 20                       # BM25 检索返回的候选块数
+    rrf_k: 60                       # RRF 融合参数 k
+
+obsidian:
+  vault_path: ""                    # Obsidian Vault 路径（留空则不启用）
+  output_subdir: "imports"          # 导入文件在 vault 中的子目录
+
+logging:
+  level: "INFO"                     # DEBUG | INFO | WARNING | ERROR
+  file: ""                          # 日志文件路径（为空则仅输出到控制台）

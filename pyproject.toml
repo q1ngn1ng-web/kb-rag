@@ -1,0 +1,75 @@
+[project]
+name = "knowledge-base"
+version = "0.1.0"
+description = "个人知识库工具链：将 PDF/Word/EPUB 等多格式文档转为 Markdown，通过 LLM 提取实体关系构建知识图谱，支持自然语言检索"
+requires-python = ">=3.10"
+dependencies = [
+    # PDF 解析
+    "PyMuPDF>=1.23",
+    # DOCX 解析
+    "python-docx>=1.1",
+    # EPUB 解析
+    "ebooklib>=0.18",
+    # 知识图谱引擎
+    "lightrag-hku>=1.5",
+    # MCP 服务器
+    "fastmcp>=3.0",
+    # LLM 客户端（DeepSeek / OpenAI 兼容）
+    "openai>=1.0",
+    # YAML 配置管理
+    "pyyaml>=6.0",
+    # HTTP 客户端（MinerU API 调用）
+    "httpx>=0.27",
+    # HTML 解析
+    "beautifulsoup4>=4.12",
+    # Markdown 转换
+    "markdown>=3.5",
+    # 进度条
+    "tqdm>=4.66",
+    # 数据校验
+    "pydantic>=2.0",
+    # 可选: Streamlit UI
+    "streamlit>=1.35",
+    "langchain-text-splitters>=0.3",
+    "jieba>=0.42.1",
+    "rank-bm25>=0.2.2",
+]
+
+[project.optional-dependencies]
+test = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.24",
+    "pytest-cov>=5.0",
+]
+ocr = [
+    "paddlepaddle>=2.6",
+    "paddleocr>=2.8",
+]
+dev = [
+    "knowledge-base[test]",
+]
+
+[build-system]
+requires = ["setuptools>=75"]
+build-backend = "setuptools.build_meta"
+
+[[tool.uv.index]]
+url = "https://pypi.tuna.tsinghua.edu.cn/simple"
+default = true
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["knowledge_base*"]
+
+[project.scripts]
+kb = "knowledge_base.cli:main"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+
+[dependency-groups]
+test = [
+    "pytest>=9.1.1",
+    "pytest-asyncio>=1.4.0",
+]

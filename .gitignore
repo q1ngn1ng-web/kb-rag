@@ -1,0 +1,33 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+
+# 虚拟环境
+.venv/
+kb_data
+docs
+
+# 知识图谱数据
+kb_data/
+kb_data.backup*/
+test_data/
+openspec/
+
+# 配置文件（敏感信息）
+config.local.yaml
+config.yaml
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Obsidian vault
+.obsidian/
+vault/
