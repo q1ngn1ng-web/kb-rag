@@ -27,12 +27,12 @@ class KnowledgeGraphEngine(ABC):
         ...
 
     @abstractmethod
-    def query(self, question: str, mode: str = "hybrid") -> str:
+    def query(self, question: str, mode: str = "mix") -> str:
         """查询知识图谱。
 
         Args:
             question: 自然语言查询。
-            mode: 检索模式 — "local"（实体级）/ "global"（关系级）/ "hybrid"（混合，默认）/ "mix"（混合 + 原文块向量检索）。
+            mode: 检索模式 — "local"（实体级）/ "global"（关系级）/ "hybrid"（混合）/ "mix"（混合 + 原文块向量检索，默认）。
 
         Returns:
             包含上下文的回答文本。

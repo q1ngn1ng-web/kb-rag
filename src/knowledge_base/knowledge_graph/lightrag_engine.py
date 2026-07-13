@@ -108,6 +108,19 @@ class LightRAGEngine(KnowledgeGraphEngine):
 
             api_key = llm_config.get("api_key", "")
 
+            # ---- 建立持久事件循环 ----
+            # 必须在任何 asyncio 操作之前创建并安装，确保 LightRAG 初始化
+            # 和后续 _run_sync() 使用同一个循环，避免 Lock / PriorityQueue
+            # 跨事件循环失效。
+            import asyncio
+
+            try:
+                self._loop = asyncio.get_running_loop()
+            except RuntimeError:
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                self._loop = loop
+
             # ---- LLM 函数 ----
             llm_client = openai.AsyncOpenAI(
                 api_key=api_key,
@@ -191,18 +204,8 @@ class LightRAGEngine(KnowledgeGraphEngine):
                 role_llm_configs=role_llm_configs,
             )
 
-            # ---- 步骤 2：初始化存储 ----
-            # LightRAG 1.5+ 需要先初始化存储。此步骤在临时事件循环中运行，
-            # 内部的 asyncio.Lock 会绑定到该临时循环。
-            asyncio.run(self._rag.initialize_storages())
-
-            # ---- 步骤 3：替换绑定到已关闭临时循环的锁 ----
-            # asyncio.run() 创建的临时循环已关闭，但 LightRAG 的模块级
-            # asyncio.Lock 已绑定到它。替换为新的锁，它们会在首次 await
-            # 时绑定到当前线程的持久事件循环。
-            import lightrag.kg.shared_storage as _lr_ss
-            _lr_ss._data_init_lock = asyncio.Lock()
-            _lr_ss._internal_lock = asyncio.Lock()
+            # ---- 步骤 2：初始化存储（在同一持久循环上） ----
+            self._loop.run_until_complete(self._rag.initialize_storages())
 
             self._initialized = True
 
@@ -310,6 +313,7 @@ class LightRAGEngine(KnowledgeGraphEngine):
                 max_relation_tokens=kg_config.get("max_relation_tokens", 16000),
                 max_total_tokens=kg_config.get("max_total_tokens", 60000),
                 only_need_prompt=True,
+                enable_rerank=False,
             )
             result = self._rag.query(question, param=prompt_param)
             prompt_str = str(result)
