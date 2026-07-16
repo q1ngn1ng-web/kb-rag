@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import re
 import threading
 import time
 from concurrent.futures import Future
@@ -215,14 +216,41 @@ class LightRAGEngine(KnowledgeGraphEngine):
 
         # ---- LightRAG 实例 ----
         provider = llm_config.get("provider", "")
+        extract_cfg = llm_config.get("extract") or {}
+
+        role_llm_configs: dict[str, dict[str, Any]] = {
+            "extract": {"max_async": 4},
+            "keyword": {"max_async": 4},
+            "query": {"max_async": 4},
+        }
         if provider == "xiaomi":
-            role_llm_configs = {
-                "extract": {"max_async": 4},
-                "keyword": {"max_async": 4},
-                "query": {"max_async": 4},
-            }
-        else:
-            role_llm_configs = None
+            pass  # 保留小米原有的限流配置
+        # 其他 provider 也使用同样的 max_async=4 限流
+
+        # 抽取阶段使用独立模型（如果配置了 llm.extract），结构化输出更稳
+        if extract_cfg.get("model"):
+            extract_model = extract_cfg.get("model")
+            extract_max_tokens = extract_cfg.get("max_tokens", 4096)
+            extract_temperature = extract_cfg.get("temperature", 0.3)
+
+            async def _extract_llm_func(
+                prompt: str,
+                system_prompt: str | None = None,
+                **kwargs: Any,
+            ) -> str:
+                messages: list[dict[str, str]] = []
+                if system_prompt:
+                    messages.append({"role": "system", "content": system_prompt})
+                messages.append({"role": "user", "content": prompt})
+                response = await llm_client.chat.completions.create(
+                    model=extract_model,
+                    messages=messages,
+                    max_tokens=extract_max_tokens,
+                    temperature=extract_temperature,
+                )
+                return response.choices[0].message.content or ""
+
+            role_llm_configs["extract"]["func"] = _extract_llm_func
 
         self._rag = LightRAG(
             working_dir=str(self.working_dir),
@@ -308,19 +336,27 @@ class LightRAGEngine(KnowledgeGraphEngine):
         """异步查询知识图谱（推荐 MCP 使用）。"""
         await self._ensure_ready()
         t0 = time.time()
+        logger.info("[计时] 查询开始: %s...", question[:40])
 
         # 1. 语义缓存
         embedding: list[float] | None = None
         if self._embed_cache_client:
+            t_embed = time.time()
             embedding = await self._aget_question_embedding(question)
+            logger.info("[计时] 缓存 embedding: %.2fs", time.time() - t_embed)
             if embedding:
                 cached = self._query_cache.lookup(embedding, mode)
                 if cached is not None:
+                    logger.info(
+                        "[计时] 缓存命中，总耗时: %.2fs", time.time() - t0
+                    )
                     logger.info(
                         f"缓存命中 ({time.time() - t0:.1f}s) | mode={mode} | "
                         f'query="{question[:60]}"'
                     )
                     return cached
+        else:
+            logger.info("[计时] 语义缓存未启用")
 
         try:
             from lightrag import QueryParam
@@ -333,6 +369,7 @@ class LightRAGEngine(KnowledgeGraphEngine):
             if time.time() - t0 >= query_timeout:
                 raise TimeoutError(f"查询超时（{query_timeout}s）")
 
+            t_light = time.time()
             prompt_param = QueryParam(
                 mode=mode,
                 top_k=kg_config.get("top_k", 60),
@@ -352,10 +389,15 @@ class LightRAGEngine(KnowledgeGraphEngine):
                     None, lambda: self._rag.query(question, param=prompt_param)
                 )
             prompt_str = str(result)
+            logger.info("[计时] LightRAG 生成 prompt: %.2fs", time.time() - t_light)
 
             # 3. BM25 RRF 重排序（纯 CPU，同步即可）
+            t_bm25 = time.time()
             if self._bm25 and bm25_cfg.get("enabled", True):
                 prompt_str = self._rerank_chunks_with_bm25(prompt_str, question)
+                logger.info("[计时] BM25 重排序: %.2fs", time.time() - t_bm25)
+            else:
+                logger.info("[计时] BM25 已禁用")
 
             # 4. 调用 LLM 生成最终回答
             elapsed = time.time() - t0
@@ -366,19 +408,29 @@ class LightRAGEngine(KnowledgeGraphEngine):
                     query_timeout - elapsed,
                 ),
             )
+            logger.info("[计时] 进入 LLM，剩余超时: %.1fs", llm_remaining)
             logger.info("LLM 生成回答中（最长等待 %s 秒）…", llm_remaining)
+            t_llm = time.time()
 
             result_str = await asyncio.wait_for(
                 self._llm_func(prompt=prompt_str, system_prompt=None),
                 timeout=llm_remaining,
             )
+            logger.info("[计时] LLM 调用: %.2fs", time.time() - t_llm)
+
+            # 后处理：去除 LLM 输出中的 Markdown 格式残留
+            from knowledge_base.utils import clean_markdown_artifacts
+
+            result_str = clean_markdown_artifacts(result_str)
 
             # 5. 写缓存
             if embedding:
                 self._query_cache.store(question, embedding, mode, result_str)
 
+            total = time.time() - t0
+            logger.info("[计时] 总耗时: %.2fs", total)
             logger.info(
-                f"查询完成 ({time.time() - t0:.1f}s) | mode={mode} | "
+                f"查询完成 ({total:.1f}s) | mode={mode} | "
                 f'query="{question[:60]}"'
             )
             return result_str
@@ -435,7 +487,8 @@ class LightRAGEngine(KnowledgeGraphEngine):
         self, doc_id: str, content: str, metadata: dict | None = None
     ) -> int:
         """同步索引文档。"""
-        return self._submit(self.aindex_document(doc_id, content, metadata))
+        timeout = self.config.get("knowledge_graph", {}).get("index_timeout", 300)
+        return self._submit(self.aindex_document(doc_id, content, metadata), timeout=timeout)
 
     def query(self, question: str, mode: str = "hybrid") -> str:
         """同步查询。"""

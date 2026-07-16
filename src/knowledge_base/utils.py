@@ -79,6 +79,49 @@ def sanitize_filename(name: str) -> str:
     return re.sub(r'[\\/:*?"<>|]', "_", name)
 
 
+def clean_markdown_artifacts(text: str) -> str:
+    """清理 Markdown / 抽取过程中引入的格式残留。
+
+    处理以下污染（防止污染下游 chunk / LLM prompt / 最终回答）：
+    - ASCII ``*``、全角 ``＊``、算子 ``∗``、实心 ``✱`` 等星号变体
+    - 单个或连续出现的星号（避免 ``有****无`` / ``性理****`` 这种抽取断裂）
+    - CJK 字符之间或边界的孤立星号（兜底）
+    - 反引号代码标记（``` `` ``）
+    - 连续下划线（``__``）
+
+    Args:
+        text: 待清理的文本。
+
+    Returns:
+        清理后的文本。
+    """
+    if not text:
+        return text
+
+    # 各种星号变体（PDF/EPUB 抽取常见全角 / 算子）
+    star_variants = r"[*＊∗✱]"
+
+    # 1) 任意连续星号序列（覆盖 **, ****, ＊, ∗, ∗＊∗ 等所有组合）
+    text = re.sub(rf"{star_variants}+", "", text)
+
+    # 2) 兜底：CJK 与星号 / CJK 与星号 / 拉丁词与星号 的边界（防止漏网变体）
+    cjk = r"[\u4e00-\u9fff\u3000-\u303f\uff00-\uffef]"
+    text = re.sub(rf"(?<={cjk}){star_variants}+(?={cjk})", "", text)
+    text = re.sub(rf"(?<={cjk}){star_variants}+(?=\w)", "", text)
+    text = re.sub(rf"(?<=\w){star_variants}+(?={cjk})", "", text)
+
+    # 3) 反引号代码标记
+    text = re.sub(r"`+", "", text)
+
+    # 4) 连续下划线
+    text = re.sub(r"_{2,}", "", text)
+
+    # 5) 行尾 / 段尾孤立星号（部分抽取器会留下）
+    text = re.sub(rf"{star_variants}+\s*$", "", text, flags=re.MULTILINE)
+
+    return text.strip()
+
+
 def unique_path(base_dir: Path, name: str, suffix: str = "") -> Path:
     """生成不重复的文件/文件夹路径。
 

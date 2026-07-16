@@ -146,25 +146,16 @@ def _get_entity_value(entity: dict, *keys: str, default: str = "") -> str:
 
 
 def _highlight_entities(text: str, entities: list[dict]) -> str:
-    """高亮实体名称（用 **bold** 包裹），用于 Streamlit markdown 渲染。"""
-    if not entities or not text:
-        return text
+    """高亮实体名称（已禁用：会导致 UI 中出现大量 **** 污染）。
 
-    # 提取所有实体名称，按长度降序排列避免部分替换
-    names: list[str] = []
-    for e in entities:
-        name = _get_entity_value(e, "name", "entity_name")
-        if name:
-            names.append(name)
+    原实现用 ``**xxx**`` 包实体名，但：
+    1. LLM 输出里偶尔会有不规则的 ``*`` 残留，叠加后变成 ``文**理**`` / ``人****文``
+    2. 单字实体（理 / 文 / 名）高亮后视觉上很碎
 
-    names.sort(key=len, reverse=True)
-
-    result = text
-    for name in names:
-        if name in result:
-            result = result.replace(name, f"**{name}**")
-
-    return result
+    现直接返回原文，由用户自行解读。可在此处重新启用高亮（用 HTML/emoji 等
+    非 markdown 标记）。
+    """
+    return text
 
 
 # ---------------------------------------------------------------------------
@@ -384,8 +375,10 @@ def _render_search_page() -> None:
                     for doc in docs:
                         doc_id = doc.get("id", "")
                         doc_path = doc.get("path", "")
+                        # 优先用 doc_id（即 kv_store_full_docs.json 的 key，本身就是标题）
+                        # 只有当 doc_path 是真实存在的文件时，才用文件名 stem 覆盖
                         title = doc_id
-                        if doc_path:
+                        if doc_path and Path(doc_path).exists():
                             title = Path(doc_path).stem
                         st.write(f"- {title}")
 

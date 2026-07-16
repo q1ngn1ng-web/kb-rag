@@ -93,7 +93,9 @@ def write_markdown(
     output_path = _unique_filename(output_dir, output_filename)
 
     # 构建完整的 Markdown 内容（frontmatter + 正文）
-    content = frontmatter + "\n\n" + (result.markdown or "")
+    from knowledge_base.utils import clean_markdown_artifacts
+
+    content = frontmatter + "\n\n" + clean_markdown_artifacts(result.markdown or "")
 
     # 保存图片并重写 Markdown 正文中的图片引用
     if result.images:
