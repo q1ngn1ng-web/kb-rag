@@ -26,6 +26,7 @@ class ChineseBM25Index:
         self._chunk_ids: list[str] = []
         self._bm25: BM25Okapi | None = None
 
+        self._tokenized_corpus: list[list[str]] = []
         if self.index_path.exists():
             self._load()
 
@@ -72,7 +73,30 @@ class ChineseBM25Index:
         self._bm25 = BM25Okapi(corpus)
         self._save()
         return len(self._chunk_ids)
+    
+    def incremental_update_for_doc(self, doc_id: str) -> int:
+        """增量更新：只对新出现的 chunk 做 jieba，只重建 BM25 内部结构。
+        避免重复 tokenize 历史 chunk（这是 CPU 热点）。
+        """
+        chunks_path = self.working_dir / "kv_store_text_chunks.json"
+        if not chunks_path.exists():
+            return 0
 
+        data: dict[str, Any] = json.loads(chunks_path.read_text(encoding="utf-8"))
+        current_set = set(self._chunk_ids)
+        new_ids = [cid for cid in data.keys() if cid not in current_set]
+        if not new_ids:
+            return 0
+
+        # 只 tokenize 新 chunk（核心优化点）
+        new_corpus = [self._tokenize(data[cid].get("content", "")) for cid in new_ids]
+        self._tokenized_corpus.extend(new_corpus)
+        self._chunk_ids.extend(new_ids)
+
+        # 重建 BM25Okapi（必须全量传 corpus，但 tokenized 已经缓存）
+        self._bm25 = BM25Okapi(self._tokenized_corpus)
+        self._save()
+        return len(new_ids)
     # ------------------------------------------------------------------
     # 内部
     # ------------------------------------------------------------------
@@ -84,16 +108,19 @@ class ChineseBM25Index:
         payload = {
             "chunk_ids": self._chunk_ids,
             "bm25": self._bm25,
+            "tokenized_corpus": self._tokenized_corpus,
             "updated_at": time.time(),
         }
-        self.working_dir.mkdir(parents=True, exist_ok=True)
-        self.index_path.write_bytes(pickle.dumps(payload))
+        ...
 
     def _load(self) -> None:
         try:
             payload = pickle.loads(self.index_path.read_bytes())
             self._chunk_ids = payload.get("chunk_ids", [])
             self._bm25 = payload.get("bm25")
+            self._tokenized_corpus = payload.get("tokenized_corpus", [])
         except (pickle.UnpicklingError, EOFError, KeyError):
             self._bm25 = None
             self._chunk_ids = []
+            self._tokenized_corpus = []
+
