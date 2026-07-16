@@ -8,7 +8,7 @@ build/
 # 虚拟环境
 .venv/
 kb_data
-docs
+
 
 # 知识图谱数据
 kb_data/
