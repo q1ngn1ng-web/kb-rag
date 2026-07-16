@@ -125,19 +125,19 @@ graph TB
 - **待补充**：完整导入日志 + 查询日志 + 缓存命中截图 + Obsidian 实体笔记截图（欢迎 PR）
 
 **示例 1 唐君毅六种理查询效果**
-<image-card alt="唐君毅六种理查询后台日志" src="docs/images/query-front-result-philosophy" ></image-card>
+<image-card alt="唐君毅六种理查询后台日志" src="docs/images/query-front-result-philosophy.png" ></image-card>
 
 
 **示例 1 唐君毅六种理语义缓存命中示例**
 Question1:唐君毅是如何区分六种理的
-<image-card alt="唐君毅六种理查询后台日志" src="docs/images/query-front-semantic01-result-philosophy" ></image-card>
+<image-card alt="唐君毅六种理查询后台日志" src="docs/images/query-front-semantic01-result-philosophy.png" ></image-card>
 
 Question2:唐君毅所提到的六种理各有什么特点？
-<image-card alt="唐君毅六种理查询后台日志" src="docs/images/query-front-semantic02-result-philosophy" ></image-card>
+<image-card alt="唐君毅六种理查询后台日志" src="docs/images/query-front-semantic02-result-philosophy.png" ></image-card>
 可以看到，缓存命中下，耗时只有0.3秒，并且这两个问题是语义相近的，被语义缓存命中，不会被认为是一个新问题再去向量库中检索，二者返回的结果也是相同的。
 
 **示例 1 唐君毅六种理查询后台日志**
-<image-card alt="唐君毅六种理查询后台日志" src="docs/images/query-back-result-philosophy" ></image-card>
+<image-card alt="唐君毅六种理查询后台日志" src="docs/images/query-back-result-philosophy.png" ></image-card>
 
 ### 示例 2：学术论文公式 + 表格精确问答
 - 数据：手势识别相关论文（含 YOLO 改进、SPP 公式等）
