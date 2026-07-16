@@ -50,7 +50,8 @@ knowledge_graph:
   max_entity_tokens: 6000           # 实体上下文的 token 预算
   max_relation_tokens: 8000         # 关系上下文的 token 预算
   max_total_tokens: 50000           # LLM 上下文总 token 预算（调小避免超时）
-  query_timeout: 60                 # 查询总超时（秒）
+  query_timeout: 120                # 查询总超时（秒）
+  entity_injection_enabled: false   # 默认关，开了才注入 system prompt
   bm25:
     enabled: true                   # 是否启用 BM25 多路召回
     top_k: 20                       # BM25 检索返回的候选块数
