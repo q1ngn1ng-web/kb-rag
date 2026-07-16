@@ -19,6 +19,7 @@ openspec/
 # 配置文件（敏感信息）
 config.local.yaml
 config.yaml
+.env
 
 # IDE
 .vscode/

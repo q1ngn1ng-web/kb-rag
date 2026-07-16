@@ -12,6 +12,16 @@ uv lock && uv sync          # 依赖变更后
 ```
 > uv 默认镜像已配清华源（pyproject.toml `[[tool.uv.index]]`），新机器记得 `source ~/.bashrc` 加载 `UV_DEFAULT_INDEX` 环境变量。
 
+### 敏感信息加载
+
+API Key 三种来源（优先级从高到低）：
+
+1. **shell 环境变量**（CI / Docker / 生产）
+2. **`.env` 文件**（本地开发便捷）：`cp .env.example .env` 后填值
+3. **`config.yaml`** 中 `api_key` 字段（兜底，不推荐存明文）
+
+`config.py:load_config()` 会自动 `load_dotenv()`，无需手动 source。`.env` 已在 `.gitignore` 中。
+
 ## 关键命令
 
 ```bash

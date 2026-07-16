@@ -4,12 +4,15 @@
 默认值由各调用方自行处理（config.get("key", default_value)）。
 
 配置模板见 config.yaml.example。
+
+环境变量优先级：shell env > .env 文件 > config.yaml。
 """
 
 from pathlib import Path
 from typing import Any
 
 import yaml
+from dotenv import load_dotenv
 
 from knowledge_base.exceptions import ConfigError
 
@@ -17,12 +20,20 @@ from knowledge_base.exceptions import ConfigError
 def load_config(path: str | Path = "config.yaml") -> dict[str, Any]:
     """加载 YAML 配置文件，环境变量覆盖敏感字段。
 
+    加载顺序：
+        1. 从项目根 .env 文件加载（若存在），不覆盖已有 shell env
+        2. 读取 config.yaml
+        3. 用环境变量覆盖敏感字段（仅在 api_key 为空时）
+
     Args:
         path: 配置文件路径（默认为当前目录 config.yaml）。
 
     Returns:
         配置字典。文件不存在时返回空字典，各调用方自行处理缺省值。
     """
+    # 本地开发便捷：若项目根存在 .env，自动加载（shell env 优先级更高）
+    load_dotenv()
+
     config_path = Path(path)
 
     if not config_path.exists():
